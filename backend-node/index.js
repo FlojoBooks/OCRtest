@@ -207,4 +207,5 @@ app.get('/api/download-csv', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Boekeninventarisatie Node.js backend draait op http://localhost:${PORT} (sessies)`);
+  console.log("[DEBUG] Starting server. PORT:", process.env.PORT, "GOOGLE_API_KEY set:", !!process.env.GOOGLE_API_KEY);
 }); 
