@@ -70,7 +70,7 @@ app.post('/api/sessions', (req, res) => {
 });
 
 // Health check
-app.get('/', (req, res) => {
+app.get('/api/health', (req, res) => {
   res.json({ message: 'Boekeninventarisatie Node.js API actief (sessies)' });
 });
 
