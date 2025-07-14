@@ -34,6 +34,9 @@ function App() {
   const [bulkLocations, setBulkLocations] = useState([])
   const [bulkIndex, setBulkIndex] = useState(0)
 
+  // Add state for custom location prefix
+  const [customPrefix, setCustomPrefix] = useState('')
+
   // Fetch sessions on mount
   useEffect(() => { fetchSessions() }, [])
   useEffect(() => { if (sessionId) fetchAllBooks() }, [sessionId])
@@ -58,7 +61,7 @@ function App() {
     for (let rij = 1; rij <= bulkRows; rij++) {
       for (let k = 0; k < cols.length; k++) {
         for (let stapel of bulkOrder) {
-          locs.push({ rij, kolom: cols[k], stapel })
+          locs.push({ rij, kolom: cols[k], stapel, prefix: customPrefix })
         }
       }
     }
@@ -112,6 +115,9 @@ function App() {
         ...prev,
         image: files[0]
       }))
+    } else if (name === 'customPrefix') {
+      setCustomPrefix(value)
+      setFormData(prev => ({ ...prev, customPrefix: value }))
     } else {
       setFormData(prev => ({
         ...prev,
@@ -161,6 +167,7 @@ function App() {
       formDataToSend.append('kolom', formData.kolom)
       formDataToSend.append('stapel', formData.stapel)
       formDataToSend.append('sessionId', sessionId)
+      if (customPrefix) formDataToSend.append('customPrefix', customPrefix)
 
       const response = await axios.post('/api/process-stack', formDataToSend, {
         headers: {
@@ -181,7 +188,8 @@ function App() {
             rij: '',
             kolom: '',
             stapel: 'voor',
-            image: null
+            image: null,
+            customPrefix: ''
           })
         }
         
@@ -235,6 +243,11 @@ function App() {
     marginBottom: '1rem',
     width: '100%',
     background: '#f8f9fa',
+  }
+
+  // Camera open helper
+  const openCamera = () => {
+    document.getElementById('image-input').click()
   }
 
   return (
@@ -349,16 +362,39 @@ function App() {
         </div>
 
         <div className="form-group">
-          <label htmlFor="image">Foto van boekenstapel:</label>
+          <label htmlFor="customPrefix">Locatie-prefix (optioneel):</label>
           <input
             style={appleInput}
-            type="file"
-            id="image"
-            name="image"
-            accept="image/*"
+            type="text"
+            id="customPrefix"
+            name="customPrefix"
+            value={customPrefix}
             onChange={handleInputChange}
-            required
+            placeholder="Bijv. Hendrik, 4-1A, 1-2A, ..."
           />
+          <small style={{ color: '#888' }}>Voeg een prefix toe voor speciale locaties, bijvoorbeeld 'Hendrik', '4-1A', etc.</small>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="image">Foto van boekenstapel:</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <input
+              style={appleInput}
+              type="file"
+              id="image-input"
+              name="image"
+              accept="image/*"
+              capture="environment"
+              onChange={handleInputChange}
+              required
+            />
+            <button type="button" style={appleButton} onClick={openCamera}>
+              📷 Open camera
+            </button>
+          </div>
+          <div style={{ marginTop: '0.5rem', color: '#555', fontWeight: 500 }}>
+            {customPrefix ? `${customPrefix}-` : ''}{formData.rij}{formData.kolom}-{formData.stapel.toUpperCase()}
+          </div>
         </div>
 
         <button 
