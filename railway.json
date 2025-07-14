@@ -1,11 +1,11 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
+  "rootDir": "backend-node",
   "build": {
     "builder": "NIXPACKS"
   },
   "deploy": {
     "startCommand": "npm start",
-    "rootDir": "backend-node",
     "healthcheckPath": "/",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",
