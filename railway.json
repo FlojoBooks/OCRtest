@@ -4,7 +4,8 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "uvicorn backend.main:app --host 0.0.0.0 --port $PORT",
+    "startCommand": "npm start",
+    "rootDir": "backend-node",
     "healthcheckPath": "/",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",
