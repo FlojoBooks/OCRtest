@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import axios from 'axios'
 import './App.css'
 
@@ -245,9 +245,21 @@ function App() {
     background: '#f8f9fa',
   }
 
+  // Add refs for file and camera inputs
+  const fileInputRef = useRef(null)
+  const cameraInputRef = useRef(null)
+
   // Camera open helper
   const openCamera = () => {
-    document.getElementById('image-input').click()
+    cameraInputRef.current && cameraInputRef.current.click()
+  }
+  const openFilePicker = () => {
+    fileInputRef.current && fileInputRef.current.click()
+  }
+  const clearImage = () => {
+    setFormData(prev => ({ ...prev, image: null }))
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    if (cameraInputRef.current) cameraInputRef.current.value = ''
   }
 
   return (
@@ -377,21 +389,47 @@ function App() {
 
         <div className="form-group">
           <label htmlFor="image">Foto van boekenstapel:</label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+            {/* File picker */}
             <input
-              style={appleInput}
+              style={{ ...appleInput, display: 'none' }}
               type="file"
-              id="image-input"
+              ref={fileInputRef}
+              name="image"
+              accept="image/*"
+              onChange={handleInputChange}
+              required={!formData.image}
+            />
+            <button type="button" style={appleButton} onClick={openFilePicker}>
+              📁 Bladeren
+            </button>
+            {/* Camera capture */}
+            <input
+              style={{ ...appleInput, display: 'none' }}
+              type="file"
+              ref={cameraInputRef}
               name="image"
               accept="image/*"
               capture="environment"
               onChange={handleInputChange}
-              required
+              required={!formData.image}
             />
             <button type="button" style={appleButton} onClick={openCamera}>
-              📷 Open camera
+              📷 Camera
             </button>
+            {/* Remove/clear button */}
+            {formData.image && (
+              <button type="button" style={{ ...appleButton, background: '#ffe5e5', color: '#c00' }} onClick={clearImage}>
+                ❌ Verwijder
+              </button>
+            )}
           </div>
+          {/* Preview selected image */}
+          {formData.image && (
+            <div style={{ marginTop: '0.5rem' }}>
+              <img src={URL.createObjectURL(formData.image)} alt="Preview" style={{ maxWidth: 180, maxHeight: 120, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }} />
+            </div>
+          )}
           <div style={{ marginTop: '0.5rem', color: '#555', fontWeight: 500 }}>
             {customPrefix ? `${customPrefix}-` : ''}{formData.rij}{formData.kolom}-{formData.stapel.toUpperCase()}
           </div>
