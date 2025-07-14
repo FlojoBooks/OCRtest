@@ -69,6 +69,29 @@ app.post('/api/sessions', (req, res) => {
   res.json({ sessionId });
 });
 
+// Verwijder een sessie (CSV-bestand)
+app.delete('/api/sessions/:sessionId', (req, res) => {
+  const { sessionId } = req.params;
+  const csvPath = getSessionCsvPath(sessionId);
+  if (!fs.existsSync(csvPath)) {
+    return res.status(404).json({ success: false, message: 'Sessie niet gevonden.' });
+  }
+  fs.unlinkSync(csvPath);
+  res.json({ success: true, message: 'Sessie verwijderd.' });
+});
+
+// Maak een sessie leeg (alleen header behouden)
+app.post('/api/sessions/:sessionId/clear', (req, res) => {
+  const { sessionId } = req.params;
+  const csvPath = getSessionCsvPath(sessionId);
+  if (!fs.existsSync(csvPath)) {
+    return res.status(404).json({ success: false, message: 'Sessie niet gevonden.' });
+  }
+  const header = 'titel;auteur;rij;kolom;locatie;stapel;positie_op_stapel;timestamp\n';
+  fs.writeFileSync(csvPath, header, 'utf8');
+  res.json({ success: true, message: 'Sessie geleegd.' });
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ message: 'Boekeninventarisatie Node.js API actief (sessies)' });
