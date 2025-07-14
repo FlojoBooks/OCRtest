@@ -243,6 +243,8 @@ function App() {
     marginBottom: '1rem',
     width: '100%',
     background: '#f8f9fa',
+    color: '#111', // zwart
+    '::placeholder': { color: '#222' },
   }
 
   // Add refs for file and camera inputs
