@@ -77,7 +77,7 @@ app.get('/api/health', (req, res) => {
 // POST /api/process-stack (now requires sessionId)
 app.post('/api/process-stack', upload.single('image'), async (req, res) => {
   try {
-    const { rij, kolom, stapel, sessionId } = req.body;
+    const { rij, kolom, stapel, sessionId, customPrefix } = req.body;
     if (!sessionId) return res.status(400).json({ success: false, message: 'Geen sessie opgegeven.' });
     ensureSessionCsv(sessionId);
     if (!req.file) return res.status(400).json({ success: false, message: 'Geen afbeelding geüpload.' });
@@ -133,7 +133,10 @@ app.post('/api/process-stack', upload.single('image'), async (req, res) => {
       const parts = lines[i].split(';');
       const titel = parts[0]?.replace(/"/g, '').trim() || 'N/A';
       const auteur = parts[1]?.replace(/"/g, '').trim() || 'N/A';
-      const locatie = `${rij}${kolom}`;
+      let locatie = `${rij}${kolom}`;
+      if (customPrefix) {
+        locatie = `${customPrefix}-${locatie}`;
+      }
       const positie_op_stapel = i + 1;
       books.push({
         titel,
