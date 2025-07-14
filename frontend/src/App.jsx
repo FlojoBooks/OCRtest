@@ -41,6 +41,14 @@ function App() {
   useEffect(() => { fetchSessions() }, [])
   useEffect(() => { if (sessionId) fetchAllBooks() }, [sessionId])
 
+  // Voeg useEffect toe om automatisch te uploaden als er een afbeelding is geselecteerd
+  useEffect(() => {
+    if (formData.image) {
+      handleSubmitAuto();
+    }
+    // eslint-disable-next-line
+  }, [formData.image]);
+
   const fetchSessions = async () => {
     const res = await axios.get('/api/sessions')
     setSessions(res.data)
@@ -205,6 +213,39 @@ function App() {
       console.error('Fout bij verwerken:', error)
     }
   }
+
+  // Nieuwe functie voor auto-upload zonder submit event
+  const handleSubmitAuto = async () => {
+    if (!formData.image) return;
+    if (!formData.rij || !formData.kolom) return;
+    setStatus('loading');
+    setMessage('Bezig met verwerken...');
+    try {
+      const formDataToSend = new FormData();
+      formDataToSend.append('image', formData.image);
+      formDataToSend.append('rij', formData.rij);
+      formDataToSend.append('kolom', formData.kolom);
+      formDataToSend.append('stapel', formData.stapel);
+      formDataToSend.append('sessionId', sessionId);
+      if (customPrefix) formDataToSend.append('customPrefix', customPrefix);
+      const response = await axios.post('/api/process-stack', formDataToSend, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (response.data.success) {
+        setStatus('success');
+        setMessage(response.data.message);
+        setProcessedBooks(response.data.books);
+        fetchAllBooks();
+      } else {
+        setStatus('error');
+        setMessage(response.data.message);
+      }
+    } catch (error) {
+      setStatus('error');
+      setMessage(error.response?.data?.detail || 'Er is een fout opgetreden');
+      console.error('Fout bij verwerken:', error);
+    }
+  };
 
   const handleDownloadCSV = () => {
     if (!sessionId) return
@@ -419,10 +460,15 @@ function App() {
             <button type="button" style={appleButton} onClick={openCamera}>
               📷 Camera
             </button>
-            {/* Remove/clear button */}
+            {/* Remove/clear/retake button */}
             {formData.image && (
               <button type="button" style={{ ...appleButton, background: '#ffe5e5', color: '#c00' }} onClick={clearImage}>
                 ❌ Verwijder
+              </button>
+            )}
+            {formData.image && (
+              <button type="button" style={{ ...appleButton, background: '#e0f2f7', color: '#007bff' }} onClick={handleSubmitAuto}>
+                💾 Upload
               </button>
             )}
           </div>
