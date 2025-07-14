@@ -207,12 +207,12 @@ app.get('/api/download-csv', (req, res) => {
 
 // Serve static files from the frontend build
 import path from 'path';
-const FRONTEND_DIST = path.join(process.cwd(), '../frontend/dist');
-app.use(express.static(FRONTEND_DIST));
+const FRONTEND_BUILD = path.join(process.cwd(), 'build');
+app.use(express.static(FRONTEND_BUILD));
 
 // Catch-all: serve index.html for React Router (after API routes)
 app.get(/^\/(?!api).*/, (req, res) => {
-  res.sendFile(path.join(FRONTEND_DIST, 'index.html'));
+  res.sendFile(path.join(FRONTEND_BUILD, 'index.html'));
 });
 
 app.listen(PORT, () => {
