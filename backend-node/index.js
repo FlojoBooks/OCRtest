@@ -205,6 +205,16 @@ app.get('/api/download-csv', (req, res) => {
   res.download(getSessionCsvPath(sessionId), `boeken_${sessionId}.csv`);
 });
 
+// Serve static files from the frontend build
+import path from 'path';
+const FRONTEND_DIST = path.join(process.cwd(), '../frontend/dist');
+app.use(express.static(FRONTEND_DIST));
+
+// Catch-all: serve index.html for React Router (after API routes)
+app.get(/^\/(?!api).*/, (req, res) => {
+  res.sendFile(path.join(FRONTEND_DIST, 'index.html'));
+});
+
 app.listen(PORT, () => {
   console.log(`Boekeninventarisatie Node.js backend draait op http://localhost:${PORT} (sessies)`);
   console.log("[DEBUG] Starting server. PORT:", process.env.PORT, "GOOGLE_API_KEY set:", !!process.env.GOOGLE_API_KEY);
