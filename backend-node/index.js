@@ -206,7 +206,6 @@ app.get('/api/download-csv', (req, res) => {
 });
 
 // Serve static files from the frontend build
-import path from 'path';
 const FRONTEND_BUILD = path.join(process.cwd(), 'build');
 app.use(express.static(FRONTEND_BUILD));
 
