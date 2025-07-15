@@ -497,11 +497,6 @@ function App() {
                 ❌ Verwijder
               </button>
             )}
-            {formData.image && (
-              <button type="button" style={{ ...appleButton, background: '#e0f2f7', color: '#007bff' }} onClick={handleSubmitAuto}>
-                💾 Upload
-              </button>
-            )}
           </div>
           {/* Preview selected image */}
           {formData.image && (
