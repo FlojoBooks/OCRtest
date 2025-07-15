@@ -250,6 +250,9 @@ function App() {
         fetchAllBooks();
         // Automatisch doorschakelen in bulkmodus
         if (bulkMode && bulkLocations.length > 0) {
+          setFormData(prev => ({ ...prev, image: null }));
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          if (cameraInputRef.current) cameraInputRef.current.value = '';
           setTimeout(() => nextBulk(), 800);
         }
       } else {
