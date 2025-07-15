@@ -41,12 +41,9 @@ function App() {
   useEffect(() => { fetchSessions() }, [])
   useEffect(() => { if (sessionId) fetchAllBooks() }, [sessionId])
 
-  // Voeg useEffect toe om automatisch te uploaden als er een afbeelding is geselecteerd
+  // Gebruik useEffect alleen om image preview te tonen, niet meer voor auto-upload
   useEffect(() => {
-    if (formData.image) {
-      handleSubmitAuto();
-    }
-    // eslint-disable-next-line
+    // geen automatische upload meer
   }, [formData.image]);
 
   const fetchSessions = async () => {
@@ -248,13 +245,7 @@ function App() {
         setMessage(response.data.message);
         setProcessedBooks(response.data.books);
         fetchAllBooks();
-        // Automatisch doorschakelen in bulkmodus
-        if (bulkMode && bulkLocations.length > 0) {
-          setFormData(prev => ({ ...prev, image: null }));
-          if (fileInputRef.current) fileInputRef.current.value = '';
-          if (cameraInputRef.current) cameraInputRef.current.value = '';
-          setTimeout(() => nextBulk(), 800);
-        }
+        // geen automatische doorschakeling meer
       } else {
         setStatus('error');
         setMessage(response.data.message);
