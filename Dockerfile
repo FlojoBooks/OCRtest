@@ -11,6 +11,9 @@ COPY . .
 WORKDIR /app/frontend
 RUN npm install && npm run build
 
+# Controleer of de build map bestaat
+RUN if [ ! -d /app/frontend/build ]; then echo "Frontend build is niet gelukt!"; exit 1; fi
+
 # Kopieer frontend build naar backend
 RUN rm -rf /app/backend-node/build && cp -r /app/frontend/build /app/backend-node/build
 
