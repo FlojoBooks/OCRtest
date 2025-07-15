@@ -44,7 +44,13 @@ function App() {
   // Voeg useEffect toe om automatisch te uploaden als er een afbeelding is geselecteerd
   useEffect(() => {
     if (formData.image) {
-      handleSubmitAuto();
+      (async () => {
+        await handleSubmitAuto();
+        // Automatisch doorschakelen in bulkmodus na upload
+        if (bulkMode && bulkLocations.length > 0) {
+          setTimeout(() => nextBulk(), 800);
+        }
+      })();
     }
     // eslint-disable-next-line
   }, [formData.image]);
@@ -248,10 +254,7 @@ function App() {
         setMessage(response.data.message);
         setProcessedBooks(response.data.books);
         fetchAllBooks();
-        // Automatisch naar volgende locatie in bulkmodus
-        if (bulkMode && bulkLocations.length > 0) {
-          setTimeout(() => nextBulk(), 800);
-        }
+        // doorschakelen gebeurt nu in useEffect
       } else {
         setStatus('error');
         setMessage(response.data.message);
