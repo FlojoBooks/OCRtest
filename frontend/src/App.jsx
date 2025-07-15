@@ -406,7 +406,7 @@ function App() {
               value={formData.rij}
               onChange={handleInputChange}
               required
-              disabled={bulkMode}
+              // niet disabled in bulkMode, zodat auto-upload werkt
             />
           </div>
 
@@ -421,7 +421,7 @@ function App() {
             onChange={handleInputChange}
             placeholder="bijv. A, B, C..."
             required
-            disabled={bulkMode}
+            // niet disabled in bulkMode, zodat auto-upload werkt
           />
         </div>
 
@@ -435,7 +435,7 @@ function App() {
                 value="voor"
                 checked={formData.stapel === 'voor'}
                 onChange={handleInputChange}
-                disabled={bulkMode}
+                // niet disabled in bulkMode
               />
               Voor
             </label>
@@ -446,7 +446,7 @@ function App() {
                 value="achter"
                 checked={formData.stapel === 'achter'}
                 onChange={handleInputChange}
-                disabled={bulkMode}
+                // niet disabled in bulkMode
               />
               Achter
             </label>
