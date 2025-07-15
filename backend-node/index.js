@@ -115,7 +115,7 @@ app.post('/api/process-stack', upload.single('image'), async (req, res) => {
     if (!apiKey) return res.status(500).json({ success: false, message: 'GOOGLE_API_KEY niet ingesteld.' });
 
     const geminiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + apiKey;
-    const prompt = `Analyseer de bijgevoegde afbeelding van een stapel boeken.\nIdentificeer ALLE boeken die je kunt lezen, van boven naar beneden.\nRetourneer elk boek als een aparte regel met dit formaat: "Titel";"Auteur". Gebruik "N/A" als een veld onbekend is. Geef alleen deze regels terug.`;
+    const prompt = `Analyseer de bijgevoegde afbeelding van een stapel boeken.\nIdentificeer ALLE boeken die je kunt lezen, van boven naar beneden.\nVerhoog indien mogelijk het contrast of pas de afbeelding aan om tekst beter leesbaar te maken.\nBekijk de afbeelding zorgvuldig en analyseer deze eventueel meerdere keren om te voorkomen dat er boeken worden gemist.\nProbeer ook boeken te herkennen die minder duidelijk zichtbaar zijn of deels bedekt zijn.\nRetourneer elk boek als een aparte regel met dit formaat: \"Titel\";\"Auteur\". Gebruik \"N/A\" als een veld onbekend is. Geef alleen deze regels terug.`;
 
     const imageBase64 = imageBuffer.toString('base64');
     const geminiRequest = {
