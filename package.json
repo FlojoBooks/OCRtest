@@ -3,5 +3,8 @@
   "version": "1.0.0",
   "scripts": {
     "start": "echo 'No backend here. Use backend-node.'"
+  },
+  "dependencies": {
+    "csv-writer": "^1.6.0"
   }
 }

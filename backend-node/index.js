@@ -101,6 +101,17 @@ app.get('/api/health', (req, res) => {
 app.post('/api/process-stack', upload.single('image'), async (req, res) => {
   try {
     const { rij, kolom, stapel, sessionId, customPrefix } = req.body;
+    console.log('[PROCESS-STACK] Ontvangen:', { rij, kolom, stapel, sessionId, customPrefix });
+    if (req.file) {
+      console.log('[PROCESS-STACK] Bestand:', {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        path: req.file.path
+      });
+    } else {
+      console.log('[PROCESS-STACK] Geen bestand ontvangen!');
+    }
     if (!sessionId) return res.status(400).json({ success: false, message: 'Geen sessie opgegeven.' });
     ensureSessionCsv(sessionId);
     if (!req.file) return res.status(400).json({ success: false, message: 'Geen afbeelding geüpload.' });
@@ -139,7 +150,9 @@ app.post('/api/process-stack', upload.single('image'), async (req, res) => {
     try {
       const geminiRes = await axios.post(geminiUrl, geminiRequest);
       geminiResponse = geminiRes.data;
+      console.log('[PROCESS-STACK] Gemini response:', JSON.stringify(geminiResponse).slice(0, 1000));
     } catch (err) {
+      console.error('[PROCESS-STACK] Gemini API error:', err.response?.data || err.message);
       return res.status(500).json({ success: false, message: 'Fout bij Gemini API', error: err.response?.data || err.message });
     }
 
@@ -147,6 +160,7 @@ app.post('/api/process-stack', upload.single('image'), async (req, res) => {
     const text = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text || '';
     if (!text) {
       fs.unlinkSync(req.file.path);
+      console.log('[PROCESS-STACK] Geen boeken herkend in de afbeelding. Gemini response:', geminiResponse);
       return res.json({ success: false, message: 'Geen boeken herkend in de afbeelding', books: [] });
     }
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
@@ -196,6 +210,7 @@ app.post('/api/process-stack', upload.single('image'), async (req, res) => {
 
     res.json({ success: true, message: `${books.length} boeken succesvol toegevoegd aan sessie`, books });
   } catch (err) {
+    console.error('[PROCESS-STACK] Algemene fout:', err);
     res.status(500).json({ success: false, message: 'Fout bij verwerken', error: err.message });
   }
 });
