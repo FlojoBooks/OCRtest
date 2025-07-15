@@ -41,10 +41,18 @@ function App() {
   useEffect(() => { fetchSessions() }, [])
   useEffect(() => { if (sessionId) fetchAllBooks() }, [sessionId])
 
-  // Gebruik useEffect alleen om image preview te tonen, niet meer voor auto-upload
+  // In bulkmodus: automatisch uploaden en doorschakelen na foto, buiten bulkmodus: handmatig
   useEffect(() => {
-    // geen automatische upload meer
-  }, [formData.image]);
+    if (bulkMode && formData.image) {
+      (async () => {
+        await handleSubmitAuto();
+        setFormData(prev => ({ ...prev, image: null }));
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        if (cameraInputRef.current) cameraInputRef.current.value = '';
+        setTimeout(() => nextBulk(), 800);
+      })();
+    }
+  }, [formData.image, bulkMode]);
 
   const fetchSessions = async () => {
     const res = await axios.get('/api/sessions')
@@ -512,7 +520,8 @@ function App() {
         <button 
           type="submit" 
           style={appleButton}
-          disabled={status === 'loading' || (bulkMode && bulkLocations.length === 0) || !sessionId}
+          disabled={status === 'loading' || (bulkMode && bulkLocations.length > 0) || !sessionId}
+          hidden={bulkMode && bulkLocations.length > 0}
         >
           {bulkMode && bulkLocations.length > 0
             ? `Upload (${bulkIndex + 1}/${bulkLocations.length})`
