@@ -252,6 +252,17 @@ function App() {
     window.open(`/api/download-csv?sessionId=${sessionId}`, '_blank')
   }
 
+  // Helper om boeken te groeperen per locatie+stapel
+  function groupBooksByLocation(books) {
+    const groups = {};
+    for (const book of books) {
+      const key = `${book.locatie}||${book.stapel}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(book);
+    }
+    return groups;
+  }
+
   // Apple-like UI styles (inline for demo, move to App.css for real use)
   const appleCard = {
     background: 'rgba(255,255,255,0.85)',
@@ -528,17 +539,88 @@ function App() {
 
       {/* Toon alle boeken */}
       {allBooks.length > 0 && (
-        <div className="books-list">
-          <h3>Alle boeken in deze sessie ({allBooks.length}):</h3>
-          {allBooks.map((book, i) => (
-            <div key={i} className="book-item">
-              <div className="book-title">{book.titel}</div>
-              <div className="book-author">{book.auteur}</div>
-              <div className="book-location">
-                Locatie: {book.locatie} - {book.stapel} (positie {book.positie_op_stapel})
+        <div className="books-list" style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem', justifyContent: 'center' }}>
+          <h3 style={{ flexBasis: '100%' }}>Alle boeken in deze sessie ({allBooks.length}):</h3>
+          {Object.entries(groupBooksByLocation(allBooks)).map(([key, books]) => {
+            const [locatie, stapel] = key.split('||');
+            return (
+              <div key={key} style={{
+                background: 'linear-gradient(120deg,#f8fafc 0%,#e9ecef 100%)',
+                borderRadius: 20,
+                boxShadow: '0 4px 24px 0 rgba(0,0,0,0.08)',
+                padding: '1.5rem 2rem',
+                minWidth: 320,
+                maxWidth: 400,
+                margin: '1rem 0',
+                transition: 'box-shadow 0.2s',
+                position: 'relative',
+                border: '1.5px solid #e0e0e0',
+                display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+                animation: 'fadeIn 0.5s',
+              }}>
+                <div style={{ fontWeight: 700, fontSize: '1.2rem', marginBottom: 8, letterSpacing: '-0.5px', color: '#222' }}>
+                  📍 {locatie} - {stapel.toUpperCase()}
+                </div>
+                <div style={{ marginBottom: 12, color: '#888', fontSize: '0.95rem' }}>
+                  {books.length} boek(en) op deze locatie
+                </div>
+                <div style={{ width: '100%' }}>
+                  {books.map((book, i) => (
+                    <div key={i} style={{
+                      background: '#fff',
+                      borderRadius: 12,
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+                      padding: '0.7rem 1rem',
+                      marginBottom: 8,
+                      transition: 'box-shadow 0.2s',
+                    }}>
+                      <div className="book-title" style={{ fontWeight: 600 }}>{book.titel}</div>
+                      <div className="book-author" style={{ color: '#6c757d', fontSize: '0.95rem' }}>{book.auteur}</div>
+                      <div className="book-location" style={{ fontSize: '0.85rem', color: '#495057' }}>
+                        Positie: {book.positie_op_stapel} | Tijd: {new Date(book.timestamp).toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  style={{
+                    background: 'linear-gradient(90deg,#ffe5e5,#ffd6d6)',
+                    color: '#c00',
+                    border: 'none',
+                    borderRadius: 10,
+                    padding: '0.6rem 1.5rem',
+                    fontWeight: 600,
+                    fontSize: '1rem',
+                    marginTop: 10,
+                    alignSelf: 'flex-end',
+                    boxShadow: '0 2px 8px 0 rgba(0,0,0,0.04)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  onClick={async () => {
+                    if (!window.confirm(`Weet je zeker dat je ALLE boeken van locatie ${locatie} - ${stapel} wilt verwijderen?`)) return;
+                    setStatus('loading');
+                    setMessage('Bezig met verwijderen...');
+                    try {
+                      await axios.post('/api/books/delete-by-location', {
+                        sessionId,
+                        locatie,
+                        stapel
+                      });
+                      setStatus('success');
+                      setMessage('Boeken verwijderd voor deze locatie.');
+                      fetchAllBooks();
+                    } catch (err) {
+                      setStatus('error');
+                      setMessage('Fout bij verwijderen.');
+                    }
+                  }}
+                >
+                  🗑️ Verwijder boeken van deze locatie
+                </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

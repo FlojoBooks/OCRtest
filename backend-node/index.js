@@ -223,6 +223,48 @@ app.get('/api/books', (req, res) => {
     });
 });
 
+// Verwijder boeken van een specifieke locatie+stapel
+app.post('/api/books/delete-by-location', async (req, res) => {
+  const { sessionId, locatie, stapel } = req.body;
+  if (!sessionId || !locatie || !stapel) {
+    return res.status(400).json({ success: false, message: 'sessionId, locatie en stapel zijn verplicht.' });
+  }
+  ensureSessionCsv(sessionId);
+  const csvPath = getSessionCsvPath(sessionId);
+  const rows = [];
+  const header = 'titel;auteur;rij;kolom;locatie;stapel;positie_op_stapel;timestamp\n';
+  // Lees alle boeken behalve de te verwijderen locatie+stapel
+  await new Promise((resolve, reject) => {
+    fs.createReadStream(csvPath)
+      .pipe(csvParser({ separator: ';' }))
+      .on('data', (data) => {
+        if (!(data.locatie === locatie && data.stapel === stapel)) {
+          rows.push(data);
+        }
+      })
+      .on('end', resolve)
+      .on('error', reject);
+  });
+  // Schrijf gefilterde boeken terug
+  const csvWriter = createObjectCsvWriter({
+    path: csvPath,
+    header: [
+      { id: 'titel', title: 'titel' },
+      { id: 'auteur', title: 'auteur' },
+      { id: 'rij', title: 'rij' },
+      { id: 'kolom', title: 'kolom' },
+      { id: 'locatie', title: 'locatie' },
+      { id: 'stapel', title: 'stapel' },
+      { id: 'positie_op_stapel', title: 'positie_op_stapel' },
+      { id: 'timestamp', title: 'timestamp' }
+    ],
+    fieldDelimiter: ';',
+    append: false
+  });
+  await csvWriter.writeRecords(rows);
+  res.json({ success: true, message: 'Boeken verwijderd voor deze locatie en stapel.', count: rows.length });
+});
+
 // Download CSV endpoint per sessie
 app.get('/api/download-csv', (req, res) => {
   const { sessionId } = req.query;
