@@ -105,6 +105,18 @@ function App() {
     }
   }
 
+  // Ga naar vorige locatie in bulkmodus
+  const prevBulk = () => {
+    if (bulkIndex > 0) {
+      const prev = bulkLocations[bulkIndex - 1];
+      setBulkIndex(bulkIndex - 1);
+      setFormData({ rij: prev.rij, kolom: prev.kolom, stapel: prev.stapel, image: null });
+      setStatus('idle');
+      setMessage('');
+      setProcessedBooks([]);
+    }
+  };
+
   const fetchAllBooks = async () => {
     if (!sessionId) return
     try {
@@ -236,6 +248,10 @@ function App() {
         setMessage(response.data.message);
         setProcessedBooks(response.data.books);
         fetchAllBooks();
+        // Automatisch naar volgende locatie in bulkmodus
+        if (bulkMode && bulkLocations.length > 0) {
+          setTimeout(() => nextBulk(), 800);
+        }
       } else {
         setStatus('error');
         setMessage(response.data.message);
@@ -360,9 +376,19 @@ function App() {
             </div>
             <button style={appleButton} onClick={startBulk} disabled={bulkLocations.length > 0}>Start bulk-upload</button>
             {bulkLocations.length > 0 && (
-              <div style={{ marginTop: '1rem', fontWeight: 'bold', fontSize: '1.1rem' }}>
-                Upload voor locatie: {bulkLocations[bulkIndex]?.rij}{bulkLocations[bulkIndex]?.kolom}-{bulkLocations[bulkIndex]?.stapel.toUpperCase()}<br />
-                ({bulkIndex + 1} van {bulkLocations.length})
+              <div style={{ marginTop: '1rem', fontWeight: 'bold', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <span>
+                  Upload voor locatie: {bulkLocations[bulkIndex]?.rij}{bulkLocations[bulkIndex]?.kolom}-{bulkLocations[bulkIndex]?.stapel.toUpperCase()}<br />
+                  ({bulkIndex + 1} van {bulkLocations.length})
+                </span>
+                <button
+                  type="button"
+                  style={{ ...appleButton, background: '#e0f2f7', color: '#007bff', padding: '0.5rem 1.2rem', fontSize: '1rem', margin: 0 }}
+                  onClick={prevBulk}
+                  disabled={bulkIndex === 0}
+                >
+                  ⬅️ Vorige locatie
+                </button>
               </div>
             )}
           </div>
