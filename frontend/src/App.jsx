@@ -391,6 +391,14 @@ function App() {
                 >
                   ⬅️ Vorige locatie
                 </button>
+                <button
+                  type="button"
+                  style={{ ...appleButton, background: '#f5f6fa', color: '#222', padding: '0.5rem 1.2rem', fontSize: '1rem', margin: 0 }}
+                  onClick={nextBulk}
+                  disabled={bulkIndex === bulkLocations.length - 1}
+                >
+                  Volgende locatie ➡️
+                </button>
               </div>
             )}
           </div>
