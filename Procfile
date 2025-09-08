@@ -1,1 +1,1 @@
-web: uvicorn backend.main:app --host 0.0.0.0 --port $PORT 
+web: gunicorn --chdir backend main:app --bind 0.0.0.0:$PORT

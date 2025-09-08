@@ -1,25 +1,23 @@
-# Gebruik Node 18 als base image
-FROM node:18 as build
+# Use an official Python runtime as a parent image
+FROM python:3.11-slim
 
-# Maak werkdirectory
+# Set the working directory in the container
 WORKDIR /app
 
-# Kopieer hele monorepo
-COPY . .
+# Copy the requirements file into the container at /app
+COPY requirements.txt .
 
-# Build frontend
-WORKDIR /app/frontend
-RUN npm install && npm run build
+# Install any needed packages specified in requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Controleer of de build map bestaat
-RUN if [ ! -d /app/frontend/build ]; then echo "Frontend build is niet gelukt!"; exit 1; fi
+# Copy the backend directory into the container at /app
+COPY ./backend .
 
-# Kopieer frontend build naar backend
-RUN rm -rf /app/backend-node/build && cp -r /app/frontend/build /app/backend-node/build
+# Make port 5001 available to the world outside this container
+EXPOSE 5001
 
-# Installeer backend dependencies
-WORKDIR /app/backend-node
-RUN npm install --production
+# Define environment variable
+ENV NAME World
 
-# Start backend
-CMD ["npm", "start"] 
+# Run main.py when the container launches
+CMD ["gunicorn", "--bind", "0.0.0.0:5001", "main:app"]

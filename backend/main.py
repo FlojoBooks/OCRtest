@@ -1,223 +1,232 @@
 import os
 import sqlite3
-from datetime import datetime
-from typing import List, Optional
-from fastapi import FastAPI, File, Form, UploadFile, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from pydantic import BaseModel
 import google.generativeai as genai
 from PIL import Image
-import io
-import os
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from dotenv import load_dotenv
+import bcrypt
+from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required, JWTManager
 
-# Configureer de Gemini API
+load_dotenv()
+
+# --- CONFIGURATION ---
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
-    raise ValueError("GOOGLE_API_KEY environment variable is not set")
+    GOOGLE_API_KEY = "AIzaSyBfdqUl4zurX9eaj7NrqZiw0ACT9_0aH4k"
 
 genai.configure(api_key=GOOGLE_API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
-app = FastAPI(title="Boekeninventarisatie API", version="1.0.0")
+DATABASE = 'books.db'
+UPLOAD_FOLDER = 'uploads'
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
 
-# CORS middleware voor frontend communicatie
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In productie, specificeer je frontend URL
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+PROMPT_TEMPLATE = """
+Analyseer de bijgevoegde afbeelding van boekenruggen.
 
-# Database setup
-def init_db():
-    conn = sqlite3.connect('database.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS books (
-            id INTEGER PRIMARY KEY,
-            titel TEXT,
-            auteur TEXT,
-            rij INTEGER,
-            kolom TEXT,
-            locatie TEXT,
-            stapel TEXT,
-            positie_op_stapel INTEGER,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.commit()
+Voor elk herkenbaar boek, extraheer de volgende informatie:
+- Titel
+- Auteur(s)
+- Uitgever
+
+Retourneer de informatie als een enkele tekst in CSV-formaat.
+Gebruik voor elk boek een aparte regel, waarbij de velden worden gescheiden door een puntkomma (;).
+Gebruik het volgende formaat:
+"Titel";"Auteur(s)";"Uitgever"
+Als een veld niet herkenbaar is, vul dan "N/A" in.
+Maak de CSV-tekst zo compact en leesbaar mogelijk.  Geef alleen de CSV data terug, zonder extra uitleg.
+"""
+
+# --- FLASK APP ---
+app = Flask(__name__)
+app.config["JWT_SECRET_KEY"] = os.getenv("SECRET_KEY", "super-secret")  # Change this!
+jwt = JWTManager(app)
+CORS(app)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# --- DATABASE FUNCTIONS ---
+def get_db_connection():
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+# --- GEMINI API FUNCTION ---
+def extract_books_from_image(image_path):
+    try:
+        img = Image.open(image_path)
+        response = model.generate_content([PROMPT_TEMPLATE, img])
+        ruwe_data = response.text.strip()
+
+        if not ruwe_data:
+            return []
+
+        csv_regels = [regel.strip() for regel in ruwe_data.split('\n') if regel.strip()]
+        books = []
+        for regel in csv_regels:
+            try:
+                row = [veld.strip().replace('"', '') for veld in regel.split(';')]
+                while len(row) < 3:
+                    row.append("N/A")
+                books.append({"title": row[0], "author": row[1], "publisher": row[2]})
+            except Exception:
+                pass
+        return books
+    except Exception as e:
+        print(f"Error processing image with Gemini: {e}")
+        return []
+
+# --- AUTHENTICATION ENDPOINTS ---
+@app.route('/api/auth/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    username = data['username']
+    password = data['password'].encode('utf-8')
+    hashed_password = bcrypt.hashpw(password, bcrypt.gensalt())
+
+    conn = get_db_connection()
+    try:
+        conn.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_password))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        return jsonify({"msg": "Username already exists"}), 409
+    finally:
+        conn.close()
+
+    return jsonify({"msg": "User created"}), 201
+
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    username = data['username']
+    password = data['password'].encode('utf-8')
+
+    conn = get_db_connection()
+    user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
     conn.close()
 
-# Pydantic models
-class Book(BaseModel):
-    id: Optional[int] = None
-    titel: str
-    auteur: str
-    rij: int
-    kolom: str
-    locatie: str
-    stapel: str
-    positie_op_stapel: int
-    timestamp: Optional[str] = None
+    if user and bcrypt.checkpw(password, user['password']):
+        access_token = create_access_token(identity=user['id'])
+        return jsonify(access_token=access_token)
 
-class ProcessStackResponse(BaseModel):
-    success: bool
-    message: str
-    books: List[Book]
+    return jsonify({"msg": "Bad username or password"}), 401
 
-@app.on_event("startup")
-async def startup_event():
-    init_db()
-    
-    # Mount static files als ze bestaan
-    static_dir = "static"
-    if os.path.exists(static_dir):
-        app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+# --- BOOK ENDPOINTS ---
+@app.route('/api/books/index', methods=['POST'])
+@jwt_required()
+def index_books():
+    current_user_id = get_jwt_identity()
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+    if file:
+        filename = file.filename
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
 
-@app.get("/")
-async def root():
-    # Serve de React app als static files bestaan, anders API info
-    static_dir = "static"
-    if os.path.exists(static_dir) and os.path.exists(os.path.join(static_dir, "index.html")):
-        return FileResponse(os.path.join(static_dir, "index.html"))
-    else:
-        return {"message": "Boekeninventarisatie API is actief"}
+        books = extract_books_from_image(filepath)
 
-@app.post("/api/process-stack", response_model=ProcessStackResponse)
-async def process_stack(
-    image: UploadFile = File(...),
-    rij: int = Form(...),
-    kolom: str = Form(...),
-    stapel: str = Form(...)
-):
-    """
-    Verwerk een foto van een boekenstapel en voeg de herkende boeken toe aan de database.
-    """
-    try:
-        # Valideer input
-        if stapel not in ["voor", "achter"]:
-            raise HTTPException(status_code=400, detail="Stapel moet 'voor' of 'achter' zijn")
-        
-        if not (1 <= rij <= 10):
-            raise HTTPException(status_code=400, detail="Rij moet tussen 1 en 10 zijn")
-        
-        if not kolom.isalpha() or len(kolom) > 2:
-            raise HTTPException(status_code=400, detail="Kolom moet 1-2 letters zijn")
+        if not books:
+            return jsonify({"message": "No books found in image."}), 200
 
-        # Lees de afbeelding
-        image_data = await image.read()
-        img = Image.open(io.BytesIO(image_data))
-        
-        # Gemini prompt
-        prompt = """
-        Analyseer de bijgevoegde afbeelding van een stapel boeken. 
-        Identificeer ALLE boeken die je kunt lezen, van boven naar beneden. 
-        Retourneer elk boek als een aparte regel met dit formaat: "Titel";"Auteur". 
-        Gebruik "N/A" als een veld onbekend is. 
-        Geef alleen deze regels terug.
-        """
-        
-        # Stuur naar Gemini API
-        response = model.generate_content([prompt, img])
-        raw_data = response.text.strip()
-        
-        if not raw_data:
-            return ProcessStackResponse(
-                success=False,
-                message="Geen boeken herkend in de afbeelding",
-                books=[]
+        conn = get_db_connection()
+        c = conn.cursor()
+        for book in books:
+            c.execute(
+                "INSERT INTO books (title, author, publisher, source_image, user_id) VALUES (?, ?, ?, ?, ?)",
+                (book['title'], book['author'], book['publisher'], filename, current_user_id)
             )
-        
-        # Parse de response
-        books = []
-        lines = [line.strip() for line in raw_data.split('\n') if line.strip()]
-        
-        conn = sqlite3.connect('database.db')
-        cursor = conn.cursor()
-        
-        for position, line in enumerate(lines, 1):
-            try:
-                # Parse CSV-formaat: "Titel";"Auteur"
-                parts = line.split(';')
-                if len(parts) >= 2:
-                    titel = parts[0].strip().replace('"', '')
-                    auteur = parts[1].strip().replace('"', '')
-                else:
-                    titel = line.strip().replace('"', '')
-                    auteur = "N/A"
-                
-                # Voeg toe aan database
-                cursor.execute('''
-                    INSERT INTO books (titel, auteur, rij, kolom, locatie, stapel, positie_op_stapel)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (titel, auteur, rij, kolom, f"{rij}{kolom}", stapel, position))
-                
-                # Haal het nieuwe record op
-                cursor.execute('SELECT * FROM books WHERE id = last_insert_rowid()')
-                book_data = cursor.fetchone()
-                
-                books.append(Book(
-                    id=book_data[0],
-                    titel=book_data[1],
-                    auteur=book_data[2],
-                    rij=book_data[3],
-                    kolom=book_data[4],
-                    locatie=book_data[5],
-                    stapel=book_data[6],
-                    positie_op_stapel=book_data[7],
-                    timestamp=book_data[8]
-                ))
-                
-            except Exception as e:
-                print(f"Fout bij verwerken van regel {position}: {e}")
-                continue
-        
         conn.commit()
         conn.close()
-        
-        return ProcessStackResponse(
-            success=True,
-            message=f"{len(books)} boeken succesvol toegevoegd aan de database",
-            books=books
-        )
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Fout bij verwerken: {str(e)}")
 
-@app.get("/api/books", response_model=List[Book])
-async def get_books():
-    """
-    Haal alle boeken op uit de database.
-    """
-    try:
-        conn = sqlite3.connect('database.db')
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM books ORDER BY rij, kolom, stapel, positie_op_stapel')
-        rows = cursor.fetchall()
+        return jsonify({"message": f"{len(books)} books indexed successfully."}), 201
+
+@app.route('/api/books', methods=['GET'])
+@jwt_required()
+def get_books():
+    current_user_id = get_jwt_identity()
+    conn = get_db_connection()
+    books = conn.execute('SELECT * FROM books WHERE user_id = ?', (current_user_id,)).fetchall()
+    conn.close()
+    return jsonify([dict(ix) for ix in books])
+
+@app.route('/api/books/search', methods=['GET'])
+@jwt_required()
+def search_books():
+    current_user_id = get_jwt_identity()
+    query = request.args.get('q', '')
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    offset = (page - 1) * per_page
+
+    conn = get_db_connection()
+
+    total_books_query = conn.execute(
+        "SELECT COUNT(*) FROM books WHERE user_id = ? AND (title LIKE ? OR author LIKE ?)",
+        (current_user_id, f'%{query}%', f'%{query}%')
+    ).fetchone()
+    total_books = total_books_query[0] if total_books_query else 0
+
+    books = conn.execute(
+        "SELECT * FROM books WHERE user_id = ? AND (title LIKE ? OR author LIKE ?) ORDER BY id DESC LIMIT ? OFFSET ?",
+        (current_user_id, f'%{query}%', f'%{query}%', per_page, offset)
+    ).fetchall()
+    
+    conn.close()
+
+    total_pages = (total_books + per_page - 1) // per_page
+
+    return jsonify({
+        'books': [dict(ix) for ix in books],
+        'total_books': total_books,
+        'total_pages': total_pages,
+        'current_page': page,
+        'per_page': per_page
+    })
+
+@app.route('/api/books/<int:book_id>', methods=['PUT'])
+@jwt_required()
+def update_book(book_id):
+    current_user_id = get_jwt_identity()
+    data = request.get_json()
+    title = data['title']
+    author = data['author']
+    publisher = data['publisher']
+
+    conn = get_db_connection()
+    # check if the book belongs to the user
+    book = conn.execute('SELECT * FROM books WHERE id = ? AND user_id = ?', (book_id, current_user_id)).fetchone()
+    if book is None:
         conn.close()
-        
-        books = []
-        for row in rows:
-            books.append(Book(
-                id=row[0],
-                titel=row[1],
-                auteur=row[2],
-                rij=row[3],
-                kolom=row[4],
-                locatie=row[5],
-                stapel=row[6],
-                positie_op_stapel=row[7],
-                timestamp=row[8]
-            ))
-        
-        return books
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Fout bij ophalen boeken: {str(e)}")
+        return jsonify({"msg": "Book not found or not authorized"}), 404
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    conn.execute(
+        'UPDATE books SET title = ?, author = ?, publisher = ? WHERE id = ?',
+        (title, author, publisher, book_id)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"msg": "Book updated"})
+
+@app.route('/api/books/<int:book_id>', methods=['DELETE'])
+@jwt_required()
+def delete_book(book_id):
+    current_user_id = get_jwt_identity()
+    conn = get_db_connection()
+    # check if the book belongs to the user
+    book = conn.execute('SELECT * FROM books WHERE id = ? AND user_id = ?', (book_id, current_user_id)).fetchone()
+    if book is None:
+        conn.close()
+        return jsonify({"msg": "Book not found or not authorized"}), 404
+
+    conn.execute('DELETE FROM books WHERE id = ?', (book_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"msg": "Book deleted"})
+
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5001)
