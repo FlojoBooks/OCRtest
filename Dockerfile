@@ -20,4 +20,4 @@ EXPOSE 5001
 ENV NAME World
 
 # Run main.py when the container launches
-CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "main:app"]
+CMD gunicorn --bind 0.0.0.0:$PORT main:app
