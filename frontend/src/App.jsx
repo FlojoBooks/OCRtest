@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axiosInstance from './api';
 import './App.css';
-import Login from './components/Login';
-import Register from './components/Register';
 import EditBookModal from './components/EditBookModal';
 import ImageCropModal from './components/ImageCropModal';
 import { Oval } from 'react-loader-spinner';
@@ -14,13 +12,11 @@ const Loader = () => (
 );
 
 function App() {
-  const [token, setToken] = useState(localStorage.getItem('token'));
   const [books, setBooks] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [message, setMessage] = useState('');
   const [status, setStatus] = useState('idle'); // idle, loading, success, error
   const [editingBook, setEditingBook] = useState(null);
-  const [isRegistering, setIsRegistering] = useState(false);
   const [pagination, setPagination] = useState({
     page: 1,
     per_page: 10,
@@ -29,10 +25,8 @@ function App() {
   const [croppingImage, setCroppingImage] = useState(null);
 
   useEffect(() => {
-    if (token) {
-      fetchAllBooks();
-    }
-  }, [token, pagination.page]);
+    fetchAllBooks();
+  }, [pagination.page]);
 
   const fetchAllBooks = async () => {
     setStatus('loading');
@@ -101,11 +95,6 @@ function App() {
     setCroppingImage(null);
   };
 
-  const handleLogout = () => {
-    setToken(null);
-    localStorage.removeItem('token');
-  };
-
   const handleEdit = (book) => {
     setEditingBook(book);
   };
@@ -163,27 +152,11 @@ function App() {
     setPagination(prev => ({ ...prev, page: newPage }));
   };
 
-  if (!token) {
-    return (
-      <div className="App">
-        {isRegistering ? (
-          <Register />
-        ) : (
-          <Login setToken={setToken} />
-        )}
-        <button onClick={() => setIsRegistering(!isRegistering)}>
-          {isRegistering ? 'Switch to Login' : 'Switch to Register'}
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="App">
       {status === 'loading' && <Loader />}
       <header className="App-header">
         <h1>Book Inventory</h1>
-        <button onClick={handleLogout}>Logout</button>
       </header>
       <main>
         <div className="upload-section card">

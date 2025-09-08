@@ -145,13 +145,34 @@ def index_books():
         return jsonify({"message": f"{len(books)} books indexed successfully."}), 201
 
 @app.route('/api/books', methods=['GET'])
-@jwt_required()
+# @jwt_required()
 def get_books():
-    current_user_id = get_jwt_identity()
+    # current_user_id = get_jwt_identity()
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    offset = (page - 1) * per_page
+
     conn = get_db_connection()
-    books = conn.execute('SELECT * FROM books WHERE user_id = ?', (current_user_id,)).fetchall()
+    
+    total_books_query = conn.execute('SELECT COUNT(*) FROM books').fetchone()
+    total_books = total_books_query[0] if total_books_query else 0
+    
+    books = conn.execute(
+        'SELECT * FROM books ORDER BY id DESC LIMIT ? OFFSET ?',
+        (per_page, offset)
+    ).fetchall()
+    
     conn.close()
-    return jsonify([dict(ix) for ix in books])
+
+    total_pages = (total_books + per_page - 1) // per_page
+
+    return jsonify({
+        'books': [dict(ix) for ix in books],
+        'total_books': total_books,
+        'total_pages': total_pages,
+        'current_page': page,
+        'per_page': per_page
+    })
 
 @app.route('/api/books/search', methods=['GET'])
 @jwt_required()
